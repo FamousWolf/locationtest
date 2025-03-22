@@ -1,0 +1,99 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Location demo{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+{%  endblock %}
+
+{% block javascripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block body %}
+<div id="map" style="height: 600px;"></div>
+
+<div id="search">
+    <div class="pair">
+        <label for="latitude">Latitude:</label>
+        <input type="text" id="latitude" value="53.2517603" />
+    </div>
+    <div class="pair">
+        <label for="longitude">Longitude:</label>
+        <input type="text" id="longitude" value="6.6026877" />
+    </div>
+    <div class="pair">
+        <label for="distance">Distance in meters:</label>
+        <input type="text" id="distance" value="10000" />
+    </div>
+    <div class="buttons">
+        <input type="submit" value="Search" onclick="search()" />
+    </div>
+</div>
+
+<div id="loading" style="display: none;">Loading...</div>
+
+<div id="done" style="display: none;">
+    <a href=".">Again!</a>
+</div>
+
+<script>
+    let map = L.map('map').setView([53.2517603, 6.6026877], 10);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    let crosshair = new L.marker(map.getCenter());
+    crosshair.addTo(map);
+    map.on('drag', event => {
+        const center = map.getCenter();
+        crosshair.setLatLng(center);
+        document.getElementById('longitude').value = center.lng;
+        document.getElementById('latitude').value = center.lat;
+    });
+
+    async function search() {
+        let longitude = document.getElementById('longitude').value;
+        let latitude = document.getElementById('latitude').value;
+        let distance = document.getElementById('distance').value;
+
+        startLoading();
+
+        const params = new URLSearchParams();
+        params.append("longitude", longitude);
+        params.append("latitude", latitude);
+        params.append("distance", distance);
+        const response = await fetch(`/search?${params}`);
+        const result = await response.json();
+
+        let circle = L.circle([result.latitude, result.longitude], {
+            color: 'blue',
+            fillColor: '#00f',
+            fillOpacity: 0.1,
+            radius: result.distance
+        }).addTo(map);
+
+        result.results.forEach(location => {
+            let marker = L.marker([location.latitude, location.longitude]);
+            marker.on('click', event => {
+                marker.bindPopup('<strong>' + location.name + '</strong><br>' + location.distance).openPopup();
+            });
+            marker.addTo(map);
+        });
+
+        map.fitBounds(circle.getBounds());
+
+        endLoading();
+    }
+
+    function startLoading() {
+        document.getElementById('search').style.display = 'none';
+        document.getElementById('loading').style.display = 'initial';
+    }
+
+    function endLoading() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('done').style.display = 'initial';
+    }
+</script>
+{% endblock %}
